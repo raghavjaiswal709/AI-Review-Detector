@@ -1,47 +1,72 @@
-AI Review Detector
+# 🤖 AI Review Detector
 
-AI Review Detector is a machine learning project that identifies fake or AI-generated product reviews using Natural Language Processing (NLP). It analyzes review text and classifies it as real or fake to help improve trust in online review systems.
+AI Review Detector is a **machine learning project** that identifies **fake or AI-generated product reviews** using Natural Language Processing (NLP).  
+It analyzes review text and classifies it as **Real or Fake**, helping improve trust in online review systems.
 
-🚀 Features
+---
 
-Detects fake or AI-generated reviews
+## 🚀 Features
 
-NLP-based text preprocessing
+- Detects fake or AI-generated reviews  
+- NLP-based text preprocessing  
+- Machine learning classification  
+- Easy to extend with new datasets or models  
 
-Machine learning classification
+---
 
-Easy to extend with new datasets or models
+## 🛠 Tech Stack
 
-🛠 Tech Stack
+- Python  
+- Scikit-learn  
+- Pandas & NumPy  
+- NLTK  
+- Jupyter Notebook  
 
-Python
+---
 
-Scikit-learn
+## ⚙️ Installation
 
-Pandas & NumPy
+Clone the repository:
 
-NLTK / NLP tools
-
-Jupyter Notebook
-
-⚙️ Installation
+```bash
 git clone https://github.com/raghavjaiswal709/AI-Review-Detector.git
 cd AI-Review-Detector
+```
+
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
-▶️ Usage
+```
 
-Run the training or prediction script:
+---
 
+## ▶️ Usage
+
+Run the model:
+
+```bash
 python main.py
+```
 
-Or open the notebooks for experimentation:
+Or run the notebooks:
 
+```bash
 jupyter notebook
-📂 Project Structure
+```
+
+---
+
+## 📁 Project Structure
+
+```
 AI-Review-Detector
 │
-├── dataset/        # Review data
+├── dataset/        # Review dataset
 ├── notebooks/      # Model experiments
 ├── models/         # Trained models
 ├── utils/          # Helper functions
 └── requirements.txt
+```
+
+---
