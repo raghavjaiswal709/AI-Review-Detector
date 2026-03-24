@@ -52,18 +52,27 @@ export default function DetectPage() {
         // Simulate processing delay for UX
         await new Promise((r) => setTimeout(r, 1500));
 
-        let config: WatermarkConfig;
+        // Build config — try config JSON first (regardless of active tab), then manual.
+        // This prevents silent failures when the user has data in one field but the
+        // wrong tab is visually selected.
+        let config: WatermarkConfig | null = null;
 
-        if (inputMode === "config" && configInput.trim()) {
+        if (configInput.trim()) {
             try {
-                config = JSON.parse(configInput);
+                const parsed = JSON.parse(configInput.trim());
+                if (parsed && typeof parsed.targetString === "string" && parsed.targetString.trim()) {
+                    config = parsed as WatermarkConfig;
+                } else {
+                    toast.error("Config JSON is missing the 'targetString' field.");
+                    setAnalyzing(false);
+                    return;
+                }
             } catch {
                 toast.error("Invalid config JSON. Please check the format.");
                 setAnalyzing(false);
                 return;
             }
-        } else if (inputMode === "manual" && manualTarget.trim()) {
-            // Build a config from manual input
+        } else if (manualTarget.trim()) {
             const combinationsMap: Record<WatermarkType, number> = {
                 "random-start": 1512,
                 "technical-term": 20,
@@ -72,19 +81,20 @@ export default function DetectPage() {
             config = {
                 type: manualType,
                 method: "white-text" as InjectionMethod,
-                watermark: manualTarget,
-                targetString: manualTarget,
+                watermark: manualTarget.trim(),
+                targetString: manualTarget.trim(),
                 prompt: "",
+                encodedPrompt: "",
                 combinations: combinationsMap[manualType],
                 timestamp: new Date().toISOString(),
             };
         } else {
-            toast.error("Please provide the watermark target string or config");
+            toast.error("Please provide the watermark target string or paste a config JSON.");
             setAnalyzing(false);
             return;
         }
 
-        const detection = detectWatermark(reviewText, config);
+        const detection = detectWatermark(reviewText, config!);
         setResult(detection);
         setAnalyzing(false);
     };

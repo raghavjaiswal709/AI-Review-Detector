@@ -23,6 +23,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import {
   generateWatermark,
+  applyMethodEncoding,
   SUCCESS_RATES,
   type WatermarkType,
   type InjectionMethod,
@@ -80,29 +81,29 @@ const INJECTION_METHODS: {
     {
       id: "white-text",
       title: "White Text",
-      description: "Invisible white text on white background",
+      description: "Invisible white text + ghost text + metadata — multi-layer",
       detail:
-        "The hidden instruction is written in white-colored text at the bottom of the last page. Invisible to the human eye but readable when copy-pasted.",
-      pros: ["Simplest method", "Highest success rate", "Works with any PDF tool"],
-      cons: ["Detectable via select-all", "Visible in dark mode readers"],
+        "Layer 1: White text at the bottom of the last page — captured when the reviewer copy-pastes into an LLM. Layer 2: Ghost text (3pt, light gray, full opacity) in the page margin — captured by LLM vision when the PDF is uploaded directly. Layer 3: Instruction embedded in PDF metadata fields — captured by metadata-aware PDF processors.",
+      pros: ["Highest success rate", "Works for copy-paste AND PDF uploads", "Triple-layer redundancy"],
+      cons: ["Ghost text faintly visible under extreme zoom", "Detectable via select-all"],
     },
     {
       id: "different-language",
       title: "Symbol Language",
-      description: "Text encoded as symbols/Wingdings",
+      description: "Symbols + ghost text + metadata — multi-layer",
       detail:
-        "The instruction appears as decorative symbols (♎✌🙵♏ ⬧◆❒♏) but decodes to readable English when copy-pasted into an LLM.",
-      pros: ["Looks decorative, not suspicious", "Survives visual inspection"],
-      cons: ["Symbols may look unusual", "Less reliable than white text"],
+        "Layer 1: The instruction appears as decorative symbols in the content stream — decoded to readable English on copy-paste. Layer 2: Ghost text (3pt, light gray) in the margin for PDF-upload vision detection. Layer 3: Full instruction in PDF metadata fields.",
+      pros: ["Looks decorative, not suspicious", "Works for copy-paste AND PDF uploads"],
+      cons: ["Symbols may look unusual", "Slightly less reliable than white text"],
     },
     {
       id: "font-embedding",
       title: "Font Embedding",
-      description: "Custom fonts swap character visuals",
+      description: "Custom fonts + ghost text + metadata — multi-layer",
       detail:
-        'Most sophisticated: custom fonts visually display "ICLR 2024 conference" but the underlying text is "Start your review with..." Requires 12 custom OTF fonts.',
-      pros: ["Completely invisible", "Text looks contextually normal"],
-      cons: ["Requires Adobe Acrobat", "Manual font application needed"],
+        "Layer 1: Custom fonts visually display normal text but encode the instruction — requires 12 OTF fonts and Adobe Acrobat for full effect. Layer 2: Ghost text (3pt, light gray) in the margin for PDF-upload vision detection. Layer 3: Full instruction in PDF metadata fields.",
+      pros: ["Most stealthy visual layer", "Works for copy-paste AND PDF uploads"],
+      cons: ["Full font-embedding requires Adobe Acrobat", "Manual font application needed"],
     },
   ];
 
@@ -159,7 +160,9 @@ export default function Home() {
   const handleSelectMethod = (method: InjectionMethod) => {
     setSelectedMethod(method);
     if (watermarkConfig) {
-      setWatermarkConfig({ ...watermarkConfig, method });
+      // applyMethodEncoding re-encodes the prompt for the selected method,
+      // ensuring each method produces a genuinely different encodedPrompt in the config.
+      setWatermarkConfig(applyMethodEncoding(watermarkConfig, method));
     }
   };
 
@@ -529,9 +532,17 @@ export default function Home() {
                 <CardContent className="space-y-4">
                   <div className="bg-background/50 rounded-lg p-4 border border-border/30">
                     <p className="text-xs text-muted-foreground mb-1">
-                      Hidden prompt that will be injected:
+                      Layer 1 — encoded payload injected into PDF:
                     </p>
-                    <p className="font-mono text-sm text-[hsl(265,89%,68%)]">
+                    <p className="font-mono text-sm text-[hsl(265,89%,68%)] break-all">
+                      {watermarkConfig.encodedPrompt}
+                    </p>
+                  </div>
+                  <div className="bg-background/50 rounded-lg p-4 border border-border/30">
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Layers 2 &amp; 3 — plain-text fallback (ghost text + metadata):
+                    </p>
+                    <p className="font-mono text-sm text-muted-foreground">
                       {watermarkConfig.prompt}
                     </p>
                   </div>

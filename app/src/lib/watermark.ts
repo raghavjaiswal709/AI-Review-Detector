@@ -146,7 +146,8 @@ export interface WatermarkConfig {
     method: InjectionMethod;
     watermark: string;
     targetString: string;
-    prompt: string;
+    prompt: string;         // plain-text instruction — used for Layer 2, Layer 3, and detection
+    encodedPrompt: string;  // method-specific encoded version embedded in Layer 1
     combinations: number;
     timestamp: string;
 }
@@ -172,11 +173,44 @@ export function generateWatermark(type: WatermarkType): WatermarkConfig {
 
     return {
         type,
-        method: "white-text", // default, overridden later
+        method: "white-text", // default, overridden when method is selected
         ...result,
+        encodedPrompt: result.prompt, // default = plain text; updated by applyMethodEncoding()
         combinations,
         timestamp: new Date().toISOString(),
     };
+}
+
+// ===================== METHOD ENCODING =====================
+// Called when the user selects an injection method.
+// Updates the config's method + encodedPrompt to reflect what Layer 1
+// actually embeds in the PDF for that method.
+// Detection still uses targetString (plain text) — the LLM always
+// outputs plain text regardless of how the instruction was encoded.
+export function applyMethodEncoding(
+    config: WatermarkConfig,
+    method: InjectionMethod
+): WatermarkConfig {
+    let encodedPrompt: string;
+    switch (method) {
+        case "different-language":
+            // Represent the instruction as Unicode zodiac/dingbat symbols.
+            // In the PDF, ZapfDingbats renders ASCII as symbols visually;
+            // this Unicode form shows the user what the "symbol language" looks like.
+            encodedPrompt = textToWingdings(config.prompt);
+            break;
+        case "font-embedding":
+            // Represent the instruction using ISO-8859-1 diacritic substitution —
+            // a software approximation of the SwapP1–SwapP12 custom-font steganography
+            // from the research paper. pdf-lib Courier supports these characters.
+            encodedPrompt = textToHomoglyph(config.prompt);
+            break;
+        case "white-text":
+        default:
+            // Plain text — no encoding needed.
+            encodedPrompt = config.prompt;
+    }
+    return { ...config, method, encodedPrompt };
 }
 
 // ===================== WINGDINGS MAPPING =====================
@@ -208,7 +242,42 @@ export function textToWingdings(text: string): string {
         .join("");
 }
 
+// ===================== HOMOGLYPH MAPPING =====================
+// Font-Embedding uses ISO-8859-1 diacritic substitution.
+// Each substituted character falls within the ISO-8859-1 range,
+// so pdf-lib StandardFonts (Courier) can render them without issue.
+// The result is visually similar text that encodes differently in the
+// content stream — approximating the custom-font steganography from
+// the research paper's SwapP1–SwapP12 OTF fonts.
+export const HOMOGLYPH_MAP: Record<string, string> = {
+    'a': 'à', 'c': 'ç', 'e': 'è', 'i': 'ì', 'n': 'ñ',
+    'o': 'ò', 'u': 'ù', 'y': 'ÿ',
+    'A': 'À', 'C': 'Ç', 'E': 'È', 'I': 'Ì', 'N': 'Ñ',
+    'O': 'Ò', 'U': 'Ù', 'Y': 'Ý',
+};
+
+export function textToHomoglyph(text: string): string {
+    return text
+        .split("")
+        .map((char) => HOMOGLYPH_MAP[char] ?? char)
+        .join("");
+}
+
 // ===================== DETECTION =====================
+
+// Normalize text for robust comparison:
+// - Strips zero-width and invisible Unicode characters (common in LLM-generated text)
+// - Replaces all Unicode whitespace variants with regular ASCII spaces
+// - Collapses consecutive whitespace
+// - Lowercases and trims
+function normalizeForDetection(text: string): string {
+    return text
+        .replace(/[\u200B-\u200D\u2060\uFEFF\u00AD\u180E]/g, "") // zero-width + soft hyphen + Mongolian vowel separator
+        .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000\u2028\u2029]/g, " ") // Unicode space variants → ASCII space
+        .replace(/\s+/g, " ") // collapse multiple whitespace to single space
+        .toLowerCase()
+        .trim();
+}
 
 export function detectWatermark(
     reviewText: string,
@@ -219,8 +288,8 @@ export function detectWatermark(
     matchIndex: number;
     details: string;
 } {
-    const normalizedReview = reviewText.toLowerCase().trim();
-    const normalizedTarget = config.targetString.toLowerCase().trim();
+    const normalizedReview = normalizeForDetection(reviewText);
+    const normalizedTarget = normalizeForDetection(config.targetString);
 
     // Exact substring match
     const matchIndex = normalizedReview.indexOf(normalizedTarget);
